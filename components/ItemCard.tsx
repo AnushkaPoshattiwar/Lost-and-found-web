@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, CheckCircle2, ArrowRight, Tag, HelpCircle } from 'lucide-react';
+import { MapPin, Calendar, CheckCircle2, ArrowRight, Tag, HelpCircle, Lock } from 'lucide-react';
 import { Item } from '@/types';
 
 interface ItemCardProps {
@@ -54,6 +54,14 @@ export default function ItemCard({ item }: ItemCardProps) {
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             {isLost ? 'LOST' : 'FOUND'}
           </span>
+
+          {/* Private Badge if applicable */}
+          {item.is_private && (
+            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-sm backdrop-blur-md">
+              <Lock className="w-3 h-3" />
+              Private
+            </span>
+          )}
 
           {/* Resolved Badge */}
           {isResolved && (

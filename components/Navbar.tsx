@@ -27,6 +27,7 @@ export default function Navbar() {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/items', label: 'Browse Items' },
+    { href: '/my-reports', label: 'My Reports' },
     { href: '/lost', label: 'I Lost Something' },
     { href: '/found', label: 'I Found Something' },
     { href: '/admin', label: 'Admin' },

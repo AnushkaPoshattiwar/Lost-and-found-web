@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -17,15 +17,20 @@ import {
   ShieldCheck, 
   HelpCircle,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Unlock,
+  ShieldAlert
 } from 'lucide-react';
 import { Item } from '@/types';
 import { getItemById, updateItemStatus } from '@/lib/itemsStore';
 
-export default function ItemDetailPage() {
+function ItemDetailContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = params?.id as string;
+  const isAdmin = searchParams?.get('admin') === 'true';
 
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,7 @@ export default function ItemDetailPage() {
     async function loadItem() {
       if (!id) return;
       try {
-        const found = await getItemById(id);
+        const found = await getItemById(id, { isAdmin });
         setItem(found);
       } catch (err) {
         console.error('Failed to load item:', err);
@@ -47,7 +52,7 @@ export default function ItemDetailPage() {
       }
     }
     loadItem();
-  }, [id]);
+  }, [id, isAdmin]);
 
   const handleToggleStatus = async () => {
     if (!item) return;
@@ -113,6 +118,80 @@ export default function ItemDetailPage() {
     );
   }
 
+  // SENSITIVE ITEM PRIVACY PROTECTION CHECK:
+  // If private and user is not an authorized administrator, shield all details!
+  if (item.is_private && !isAdmin) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12 space-y-6">
+        <div>
+          <Link
+            href="/items"
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Browse</span>
+          </Link>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-amber-200 p-8 sm:p-10 shadow-sm space-y-6 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border border-amber-200">
+            <Lock className="w-8 h-8 text-amber-600" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1 text-xs font-extrabold uppercase px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+              🔒 Protected Report
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              🔒 Sensitive Item
+            </h1>
+            <p className="text-sm font-semibold text-slate-700">
+              “This report contains protected information and is not publicly accessible.”
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs sm:text-sm text-amber-950 leading-relaxed text-left space-y-2">
+            <p>
+              Because this item was marked as valuable or sensitive, its detailed description, specific engravings/serials, photo, and reporter contact information are hidden from public listings to prevent fraudulent claims.
+            </p>
+            <p className="font-semibold text-amber-950 pt-1">
+              If you believe this is your missing property, please contact campus administration or security for assisted verification:
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 text-xs">
+              <a
+                href="mailto:lostandfound@campus.edu?subject=Sensitive Item Claim Assistance"
+                className="inline-flex items-center gap-1.5 font-bold text-amber-900 hover:underline"
+              >
+                <Mail className="w-4 h-4 text-amber-700" />
+                <span>lostandfound@campus.edu</span>
+              </a>
+              <span className="hidden sm:inline text-amber-300">•</span>
+              <span className="flex items-center gap-1.5 text-amber-800">
+                <MapPin className="w-4 h-4 text-amber-700" />
+                <span>Security Desk (Main Quad Room 104)</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Link
+              href="/items"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+            >
+              Return to Public Browse
+            </Link>
+            <Link
+              href={`/admin`}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Staff Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isLost = item.type === 'lost';
   const isResolved = item.status === 'resolved';
 
@@ -158,6 +237,19 @@ export default function ItemDetailPage() {
         </button>
       </div>
 
+      {/* Admin Sensitive Report Banner */}
+      {item.is_private && isAdmin && (
+        <div className="p-4 rounded-2xl bg-amber-500 text-white flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
+            <Lock className="w-4 h-4" />
+            <span>🔒 Sensitive Item (Authorized Admin View)</span>
+          </div>
+          <span className="text-xs bg-black/20 px-2.5 py-0.5 rounded-md font-semibold">
+            Hidden from Public Listings
+          </span>
+        </div>
+      )}
+
       {/* Main Item Card */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Banner with Badges */}
@@ -174,10 +266,24 @@ export default function ItemDetailPage() {
               {isLost ? 'LOST ITEM' : 'FOUND ITEM'}
             </span>
 
+            {/* Privacy indicator */}
+            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+              item.is_private ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {item.is_private ? '🔒 Private' : '🔓 Public'}
+            </span>
+
             <span className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-white/80 border border-slate-200 text-slate-700">
               <Tag className="w-3 h-3 text-slate-500" />
               {item.category}
             </span>
+
+            {item.is_verified && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                Verified
+              </span>
+            )}
 
             {isResolved && (
               <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-slate-900 text-emerald-300">
@@ -318,5 +424,17 @@ export default function ItemDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ItemDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    }>
+      <ItemDetailContent />
+    </Suspense>
   );
 }

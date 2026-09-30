@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Upload, 
   MapPin, 
@@ -15,7 +16,12 @@ import {
   Loader2, 
   ImageIcon, 
   Sparkles,
-  X
+  X,
+  Lock,
+  Unlock,
+  ShieldAlert,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { ItemType, CATEGORIES, CAMPUS_LOCATIONS } from '@/types';
 import { createItem } from '@/lib/itemsStore';
@@ -43,10 +49,14 @@ export default function ItemForm({ type }: ItemFormProps) {
     contact_phone: '',
   });
 
+  const [isPrivate, setIsPrivate] = useState<boolean>(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [useCustomLocation, setUseCustomLocation] = useState(false);
+  
+  // Confirmation state for sensitive private submissions
+  const [submittedPrivateItem, setSubmittedPrivateItem] = useState<{ id: string; title: string } | null>(null);
 
   // Quick preset sample images for instant prototyping
   const samplePresets = isLost 
@@ -115,7 +125,7 @@ export default function ItemForm({ type }: ItemFormProps) {
     setIsSubmitting(true);
 
     try {
-      await createItem({
+      const created = await createItem({
         title: formData.title.trim(),
         description: formData.description.trim(),
         category: formData.category,
@@ -127,16 +137,73 @@ export default function ItemForm({ type }: ItemFormProps) {
         contact_email: formData.contact_email.trim(),
         contact_phone: formData.contact_phone.trim() || undefined,
         status: 'active',
+        is_private: isPrivate,
+        is_verified: false,
       });
 
-      // Redirect to items browse page
-      router.push('/items');
+      // If private, show the confirmation screen
+      if (isPrivate) {
+        setSubmittedPrivateItem({ id: created.id, title: created.title });
+        setIsSubmitting(false);
+      } else {
+        // Normal public items redirect to browse
+        router.push('/items');
+      }
     } catch (err: any) {
       console.error('Submission error:', err);
       setErrorMsg(err?.message || 'Failed to submit report. Please try again.');
       setIsSubmitting(false);
     }
   };
+
+  // If a private report was just submitted, render the private confirmation view
+  if (submittedPrivateItem) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 text-center max-w-xl mx-auto space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100 shadow-inner">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+
+        <div className="space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-900 text-white">
+            🔒 Protected Report
+          </span>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            Your sensitive item has been reported securely.
+          </h2>
+          <p className="text-sm font-semibold text-slate-700">
+            "{submittedPrivateItem.title}"
+          </p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-600 leading-relaxed text-left space-y-2">
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Privacy Protection Active</span>
+          </div>
+          <p>
+            Because this item was marked as valuable/sensitive, its details will not be displayed publicly. An administrator can review the report and assist with verification and return.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Link
+            href="/my-reports"
+            className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 text-sm transition-all flex items-center justify-center gap-2"
+          >
+            <span>Go to My Reports</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/"
+            className="w-full sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm transition-all"
+          >
+            Back to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -288,6 +355,96 @@ export default function ItemForm({ type }: ItemFormProps) {
           </div>
         </div>
 
+        {/* NEW SECTION: Sensitive Item Privacy Protection */}
+        <div className="pt-2 border-t border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-blue-600" />
+              Sensitive / Valuable Item
+            </h3>
+            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold ${
+              isPrivate ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {isPrivate ? '🔒 Private Mode' : '🔓 Public Mode'}
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-600">
+            Is this a valuable or sensitive item?
+          </p>
+
+          {/* Privacy Option Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Option 1: No - Public */}
+            <label className={`cursor-pointer p-4 rounded-xl border transition-all flex items-start gap-3 ${
+              !isPrivate 
+                ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/20' 
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }`}>
+              <input
+                type="radio"
+                name="is_private"
+                checked={!isPrivate}
+                onChange={() => setIsPrivate(false)}
+                className="mt-0.5 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="text-xs space-y-0.5">
+                <div className="font-bold text-slate-900 flex items-center gap-1">
+                  <Unlock className="w-3.5 h-3.5 text-slate-500" />
+                  No – Show in public listings
+                </div>
+                <p className="text-slate-500">
+                  Visible to everyone browsing the campus directory for fast community recovery.
+                </p>
+              </div>
+            </label>
+
+            {/* Option 2: Yes - Keep details private */}
+            <label className={`cursor-pointer p-4 rounded-xl border transition-all flex items-start gap-3 ${
+              isPrivate 
+                ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500/20' 
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }`}>
+              <input
+                type="radio"
+                name="is_private"
+                checked={isPrivate}
+                onChange={() => setIsPrivate(true)}
+                className="mt-0.5 text-amber-600 focus:ring-amber-500"
+              />
+              <div className="text-xs space-y-0.5">
+                <div className="font-bold text-slate-900 flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  Yes – Keep details private
+                </div>
+                <p className="text-slate-500">
+                  Keep this report private and protect sensitive serial numbers or valuables.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Explanation Alert */}
+          {isPrivate ? (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs space-y-1.5 animate-in fade-in duration-150">
+              <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                <Lock className="w-3.5 h-3.5 text-amber-700" />
+                Sensitive Item Privacy Protection Active
+              </div>
+              <p className="leading-relaxed">
+                Your report will be visible only to authorized administrators and will not appear in public Lost & Found listings.
+              </p>
+              <p className="leading-relaxed text-amber-800">
+                Your item's identifying details will be hidden from public listings. This helps prevent false claims for valuable belongings.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-500 italic">
+              Sensitive items are hidden from public listings and can only be accessed through admin-assisted verification.
+            </p>
+          )}
+        </div>
+
         {/* Section 2: Photo Upload */}
         <div className="space-y-3 pt-2 border-t border-slate-100">
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -406,7 +563,9 @@ export default function ItemForm({ type }: ItemFormProps) {
         {/* Submit Button */}
         <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            By submitting, this item report will be visible to campus students and staff.
+            {isPrivate 
+              ? 'This report will be securely encrypted & routed to campus administration.' 
+              : 'By submitting, this item report will be visible to campus students and staff.'}
           </p>
 
           <button
@@ -422,6 +581,11 @@ export default function ItemForm({ type }: ItemFormProps) {
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Posting Report...</span>
+              </>
+            ) : isPrivate ? (
+              <>
+                <Lock className="w-4 h-4" />
+                <span>Submit Private & Secure Report</span>
               </>
             ) : (
               <>

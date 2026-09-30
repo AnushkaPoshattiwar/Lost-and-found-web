@@ -14,6 +14,8 @@ export interface Item {
   contact_email: string;
   contact_phone?: string;
   status: ItemStatus;
+  is_private?: boolean;
+  is_verified?: boolean;
   created_at: string;
 }
 

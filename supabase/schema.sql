@@ -1,7 +1,7 @@
 -- Campus Lost & Found Supabase Schema
 -- Run this in your Supabase SQL Editor (https://supabase.com/dashboard)
 
--- 1. Create the items table
+-- 1. Create the items table with Privacy & Security features
 CREATE TABLE IF NOT EXISTS public.items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -15,38 +15,60 @@ CREATE TABLE IF NOT EXISTS public.items (
   contact_email TEXT NOT NULL,
   contact_phone TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'resolved')),
+  is_private BOOLEAN NOT NULL DEFAULT false,
+  is_verified BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+
+-- Migration support if the table already existed previously
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='is_private') THEN
+    ALTER TABLE public.items ADD COLUMN is_private BOOLEAN DEFAULT false NOT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='is_verified') THEN
+    ALTER TABLE public.items ADD COLUMN is_verified BOOLEAN DEFAULT false NOT NULL;
+  END IF;
+END $$;
 
 -- 2. Create search & filter indexes
 CREATE INDEX IF NOT EXISTS idx_items_type ON public.items(type);
 CREATE INDEX IF NOT EXISTS idx_items_category ON public.items(category);
 CREATE INDEX IF NOT EXISTS idx_items_status ON public.items(status);
+CREATE INDEX IF NOT EXISTS idx_items_is_private ON public.items(is_private);
 CREATE INDEX IF NOT EXISTS idx_items_created_at ON public.items(created_at DESC);
 
 -- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
 
--- 4. Set RLS Policies (For prototype: public read, insert, and update)
+-- 4. Set RLS Policies (Privacy-aware access control)
+-- Public users can only read items where is_private = false
+DROP POLICY IF EXISTS "Public items are viewable by everyone" ON public.items;
 CREATE POLICY "Public items are viewable by everyone" 
   ON public.items FOR SELECT 
-  USING (true);
+  USING (is_private = false);
 
+-- Anyone can submit a report (public or sensitive private)
+DROP POLICY IF EXISTS "Anyone can report an item" ON public.items;
 CREATE POLICY "Anyone can report an item" 
   ON public.items FOR INSERT 
   WITH CHECK (true);
 
+-- Status updates
+DROP POLICY IF EXISTS "Anyone can update item status" ON public.items;
 CREATE POLICY "Anyone can update item status" 
   ON public.items FOR UPDATE 
   USING (true);
 
+-- Deletion policy
+DROP POLICY IF EXISTS "Anyone can delete an item in prototype" ON public.items;
 CREATE POLICY "Anyone can delete an item in prototype" 
   ON public.items FOR DELETE 
   USING (true);
 
--- 5. Seed initial demo data
+-- 5. Seed initial demo data (including public and sensitive private items)
 INSERT INTO public.items (
-  title, description, category, type, location, date, image_url, contact_name, contact_email, contact_phone, status
+  title, description, category, type, location, date, image_url, contact_name, contact_email, contact_phone, status, is_private, is_verified
 ) VALUES
 (
   'Black Dell XPS 15 Laptop',
@@ -59,7 +81,9 @@ INSERT INTO public.items (
   'Rahul Sharma',
   'rahul.s@campus.edu',
   '+1 (555) 234-5678',
-  'active'
+  'active',
+  false,
+  true
 ),
 (
   'Apple AirPods Pro (2nd Gen)',
@@ -72,7 +96,9 @@ INSERT INTO public.items (
   'Alex Chen',
   'achen@campus.edu',
   '+1 (555) 345-6789',
-  'active'
+  'active',
+  false,
+  true
 ),
 (
   'Casio Scientific Calculator FX-991EX',
@@ -85,7 +111,9 @@ INSERT INTO public.items (
   'Sarah Jenkins',
   'sjenkins@campus.edu',
   '+1 (555) 456-7890',
-  'active'
+  'active',
+  false,
+  false
 ),
 (
   'Stainless Steel Hydro Flask (32oz Cobalt Blue)',
@@ -98,7 +126,9 @@ INSERT INTO public.items (
   'Coach Marcus',
   'marcus.athletics@campus.edu',
   '+1 (555) 567-8901',
-  'active'
+  'active',
+  false,
+  false
 ),
 (
   'Student ID Card & Navy Lanyard',
@@ -111,7 +141,9 @@ INSERT INTO public.items (
   'Priya Patel',
   'priya.p@campus.edu',
   '+1 (555) 678-9012',
-  'active'
+  'active',
+  false,
+  true
 ),
 (
   'Dorm & Bicycle Keys on Red Carabiner',
@@ -124,5 +156,22 @@ INSERT INTO public.items (
   'David Miller',
   'dmiller@campus.edu',
   '+1 (555) 789-0123',
-  'resolved'
+  'resolved',
+  false,
+  true
+),
+(
+  'Platinum Engagement Ring with Solitaire Diamond',
+  'Family heirloom ring in a small black velvet pouch. Inscribed inside with "Forever 2024". Left near the chemistry laboratory lockers.',
+  'Other',
+  'lost',
+  'Science Complex - Block B',
+  '2026-09-29',
+  'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80',
+  'Elena Rostova',
+  'erostova@campus.edu',
+  '+1 (555) 890-1234',
+  'active',
+  true,
+  true
 );
